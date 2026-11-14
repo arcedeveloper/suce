@@ -200,6 +200,9 @@ function crearRealtime(httpServer, { jwt, jwtSecret }) {
       if (fn === "pvp_crear_mesa") {
         const juego = /^[a-z_]{1,30}$/.test(body.p_juego || "") ? body.p_juego : "carta_alta";
         notificarLobbies(juego);
+      } else if (fn === "pvp_tirar") {
+        const id = String(body.p_mesa_id ?? "").replace(/\D/g, "");
+        if (id) notificar("mesa:" + id);                  // avisa al rival: "ya tiré"
       } else if (fn === "pvp_unirse_mesa" || fn === "pvp_cancelar_mesa") {
         const id = String(body.p_mesa_id ?? "").replace(/\D/g, "");
         if (id) notificar("mesa:" + id);
