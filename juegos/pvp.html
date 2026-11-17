@@ -45,6 +45,28 @@
   .pozo-duelo { color: var(--text-dim); font-size: .88rem; margin: 6px 0 2px; } .pozo-duelo b { color: var(--gold-soft); }
   .cuenta-duelo { color: var(--text-dim); font-size: .82rem; min-height: 1.2em; margin: 4px 0 10px; }
   .btn-tirar { font-size: 1.05rem; padding: 16px; }
+
+  /* Mesa por rondas */
+  .rondas-sel { margin: 4px 0 2px; } .rondas-sel .opciones { gap: 8px; }
+  .rondas-sel button.opcion { min-width: 74px; padding: 10px 12px; }
+  .trae-info { text-align: center; color: var(--text-dim); font-size: .86rem; margin: 6px 0 12px; } .trae-info b { color: var(--gold-soft); }
+  .cab-duelo { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .cab-duelo .ronda-n { font-weight: 800; color: var(--neon-suave); }
+  button.btn-rendirse { width: auto; padding: 7px 14px; font-size: .78rem; }
+  button.btn-rendirse.seguro { border-color: #f87171; color: #fca5a5; }
+  .marcador { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px; }
+  .jug-box { background: var(--bg-card-2); border-radius: 12px; padding: 10px 8px; }
+  .jug-box .quien { font-size: .8rem; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .jug-box .fichas { font-size: 1.35rem; font-weight: 800; color: var(--gold-soft); transition: color .3s; }
+  .jug-box .gan { font-size: .74rem; color: var(--text-dim); }
+  .jug-box .fichas.sube { color: var(--green); } .jug-box .fichas.baja { color: #f87171; }
+  .barra-fichas { height: 8px; border-radius: 999px; background: rgba(248,113,113,.45); overflow: hidden; margin: 2px 0 6px; }
+  .barra-fichas i { display: block; height: 100%; width: 50%; background: linear-gradient(90deg, var(--neon), var(--neon-suave)); transition: width .6s ease; }
+  .resumen-final { text-align: center; padding: 6px 0 2px; }
+  .resumen-final .gran { font-family: 'Playfair Display', serif; font-size: 1.7rem; font-weight: 900; margin-bottom: 4px; }
+  .resumen-final .gran.ganaste { color: var(--neon-suave); } .resumen-final .gran.perdiste { color: #f87171; }
+  .resumen-final .motivo { color: var(--text-dim); font-size: .9rem; margin-bottom: 10px; }
+  .resumen-final .cobro { font-size: 1.05rem; margin-bottom: 14px; } .resumen-final .cobro b { color: var(--gold-soft); }
   @media (prefers-reduced-motion: reduce) { .carta-visual.tirando, .carta-visual.pop, .carta-visual.esperando-rival { animation: none; } }
 </style>
 </head>
@@ -62,6 +84,12 @@
         <h3 style="margin-top:0;">Crear mesa</h3>
         <p class="sub" style="margin-top:-8px;" id="descripcion-juego"></p>
         <div id="rack"></div>
+        <p class="sub" style="text-align:center; margin:10px 0 2px;">¿Cuántas rondas querés traer?</p>
+        <div class="rondas-sel"><div class="opciones" id="opc-rondas">
+          <button class="opcion" data-v="5">5</button><button class="opcion sel" data-v="10">10</button>
+          <button class="opcion" data-v="20">20</button><button class="opcion" data-v="50">50</button>
+        </div></div>
+        <div class="trae-info" id="trae-info"></div>
         <button onclick="crearMesa()">Crear mesa y esperar rival</button>
         <div class="mensaje" id="mensaje-crear"></div>
       </div>
@@ -77,23 +105,40 @@
       <div class="panel" style="text-align:center;">
         <p class="estado-sala"><span class="punto-vivo-chico"></span> Esperando que alguien se una a tu mesa...</p>
         <div style="font-size:2rem; margin:14px 0;">🪙 <span id="apuesta-esperando"></span></div>
+        <p class="sub" id="detalle-esperando" style="margin-top:-6px;"></p>
         <button class="secundario" onclick="cancelarMesaActual()">Cancelar mesa</button>
       </div>
     </div>
 
-    <!-- Vista: duelo (los dos sentados: cada uno tira; después se muestra el resultado) -->
+    <!-- Vista: mesa en juego (rondas seguidas hasta que alguien se quede sin fichas o se rinda) -->
     <div id="vista-duelo" style="display:none;">
       <div class="panel" style="text-align:center;">
-        <div class="duelo-pvp">
-          <div class="lado-duelo"><div class="sub">Vos</div><div class="carta-visual" id="carta-vos">?</div><div class="est" id="est-vos"></div></div>
-          <div class="vs-pvp">VS</div>
-          <div class="lado-duelo"><div class="sub" id="nombre-rival">Rival</div><div class="carta-visual" id="carta-rival">?</div><div class="est" id="est-rival"></div></div>
+        <div class="cab-duelo">
+          <span class="ronda-n" id="ronda-n">Ronda 1</span>
+          <button class="secundario btn-rendirse" id="btn-rendirse" onclick="rendirse()">🏳️ Rendirme</button>
         </div>
-        <div class="pozo-duelo">Apuesta de cada uno: 🪙 <b id="duelo-apuesta"></b> · el ganador cobra 🪙 <b id="duelo-premio"></b></div>
-        <div class="mensaje" id="mensaje-resultado"></div>
-        <div class="cuenta-duelo" id="cuenta-duelo"></div>
-        <button class="btn-tirar" id="btn-tirar" onclick="tirar()">🎲 Tirar</button>
-        <button id="btn-otra" style="display:none;" onclick="volverAlInicio()">Jugar otra vez</button>
+        <div class="marcador">
+          <div class="jug-box"><div class="quien">Vos</div><div class="fichas" id="fichas-vos">🪙 0</div><div class="gan" id="gan-vos"></div></div>
+          <div class="jug-box"><div class="quien" id="nombre-rival">Rival</div><div class="fichas" id="fichas-rival">🪙 0</div><div class="gan" id="gan-rival"></div></div>
+        </div>
+        <div class="barra-fichas"><i id="barra-vos"></i></div>
+        <div id="zona-juego">
+          <div class="duelo-pvp">
+            <div class="lado-duelo"><div class="carta-visual" id="carta-vos">?</div><div class="est" id="est-vos"></div></div>
+            <div class="vs-pvp">VS</div>
+            <div class="lado-duelo"><div class="carta-visual" id="carta-rival">?</div><div class="est" id="est-rival"></div></div>
+          </div>
+          <div class="pozo-duelo">Cada ronda: 🪙 <b id="duelo-apuesta"></b> · el que gana la ronda cobra 🪙 <b id="duelo-premio"></b></div>
+          <div class="mensaje" id="mensaje-resultado"></div>
+          <div class="cuenta-duelo" id="cuenta-duelo"></div>
+          <button class="btn-tirar" id="btn-tirar" onclick="tirar()">🎲 Tirar</button>
+        </div>
+        <div id="zona-final" class="resumen-final" style="display:none;">
+          <div class="gran" id="final-titulo"></div>
+          <div class="motivo" id="final-motivo"></div>
+          <div class="cobro" id="final-cobro"></div>
+          <button id="btn-otra" onclick="volverAlInicio()">Volver a las mesas</button>
+        </div>
       </div>
     </div>
   </div>
@@ -139,24 +184,33 @@
     const juego = CONFIG_JUEGOS[params.get("juego")] ? params.get("juego") : "carta_alta";
     const cfg = CONFIG_JUEGOS[juego], extra = EXTRA[juego];
     const $ = (id) => document.getElementById(id);
+    const pausa = (ms) => Efectos.esperar(Efectos.reducido ? Math.min(ms, 150) : ms);
 
     $("titulo-marca").textContent = `${cfg.emoji} ${cfg.nombre}`;
-    $("descripcion-juego").textContent = cfg.desc + " Cada uno toca el botón para jugar su turno. El ganador se lleva x1.9 su apuesta.";
+    $("descripcion-juego").textContent = cfg.desc + " Mesa por rondas: juegan hasta que a uno no le alcancen las fichas o se rinda.";
     $("btn-tirar").textContent = extra.accion;
     document.title = `${cfg.nombre} — SUCE`;
 
     let mesaActualId = null, intervaloPoll = null, desuscribirMesa = null, ticksMesa = 0;
-    let enDuelo = false, tirando = false, finTiroMs = 0, relojCuenta = null, ultimoEstado = null;
+    let enDuelo = false, tirando = false, revelando = false, pendiente = null, mostradaRonda = 0, rondaPintada = 0;
+    let finTiroMs = 0, relojCuenta = null, ultimoEstado = null, rendirseTimer = null, rondasSel = 10, ultMiStack = null;
+    const premioRonda = (ap) => Math.round(Number(ap) * 1.9);
 
     async function cargarSaldo() {
       const n = await obtenerMiSaldo();
       $("saldo").textContent = fmtFichas(n);
       Mesa.saldoExterno(n);
     }
-
     function mostrarVista(nombre) {
       ["vista-sin-mesa", "vista-esperando", "vista-duelo"].forEach(id => { $(id).style.display = id === nombre ? "block" : "none"; });
     }
+
+    // ---- Crear mesa: apuesta por ronda × cantidad de rondas ----
+    function actualizarTrae() {
+      const ap = Mesa.ctrl ? Mesa.ctrl.valor : 0;
+      $("trae-info").innerHTML = `Traés <b>🪙 ${fmtFichas(ap * rondasSel)}</b> a la mesa: ${rondasSel} rondas de 🪙 ${fmtFichas(ap)}.<br>Al terminar te llevás las fichas que te queden.`;
+    }
+    crearOpciones($("opc-rondas"), (v) => { rondasSel = Number(v); actualizarTrae(); });
 
     async function cargarMesasDisponibles() {
       const cont = $("lista-mesas");
@@ -166,8 +220,8 @@
         cont.innerHTML = mesas.map(m => `
           <div class="mesa-item">
             <span class="punto-vivo-chico"></span>
-            <div class="mesa-info"><b>${m.creador_username}</b> espera rival · apostó 🪙 ${fmtFichas(m.apuesta)}</div>
-            <button onclick="unirseAMesa(${m.id}, '${m.creador_username}')">Jugar contra ${m.creador_username}</button>
+            <div class="mesa-info"><b>${m.creador_username}</b> espera rival<br><span class="sub">${m.rondas} rondas de 🪙 ${fmtFichas(m.apuesta)} · traés 🪙 ${fmtFichas(m.fichas)}</span></div>
+            <button onclick="unirseAMesa(${m.id})">Sentarme</button>
           </div>`).join("");
       } catch (e) { cont.innerHTML = '<p class="sub">No se pudieron cargar las mesas.</p>'; }
     }
@@ -175,14 +229,15 @@
     async function crearMesa() {
       const mensaje = $("mensaje-crear"); mensaje.textContent = "";
       if (!Mesa.ctrl || !Mesa.ctrl.valido()) { Mesa.ctrl && Mesa.ctrl.aviso(Mesa.ctrl.valor > Mesa.saldo ? "Tu saldo no alcanza para esta apuesta" : "Revisá el monto de la apuesta"); return; }
-      const apuesta = Mesa.ctrl.valor;
+      const apuesta = Mesa.ctrl.valor, total = apuesta * rondasSel;
+      if (total > Mesa.saldo) { Mesa.ctrl.aviso(`Para traer ${rondasSel} rondas necesitás 🪙 ${fmtFichas(total)}. Elegí menos rondas o una apuesta menor.`); return; }
       try {
-        mesaActualId = await pvpCrearMesa(apuesta, juego);
-        esperarRival(apuesta);
+        mesaActualId = await llamarRPC("pvp_crear_mesa", { p_apuesta: apuesta, p_juego: juego, p_rondas: rondasSel });
+        esperarRival({ apuesta, fichas_mesa: total });
       } catch (e) { mensaje.textContent = e.message; mensaje.className = "mensaje perdiste"; }
     }
 
-    // ---- Escuchar la mesa (WebSocket + consulta de respaldo). Sirve igual para el que crea y el que se une ----
+    // ---- Escuchar la mesa (WebSocket + consulta de respaldo). Igual para los dos jugadores ----
     function escucharMesa() {
       dejarDeEscucharMesa();
       desuscribirMesa = Realtime.suscribir("mesa:" + mesaActualId, verificarMiMesa);
@@ -194,12 +249,12 @@
       if (desuscribirMesa) { desuscribirMesa(); desuscribirMesa = null; }
     }
 
-    function esperarRival(apuesta) {
-      $("apuesta-esperando").textContent = fmtFichas(apuesta);
+    function esperarRival(m) {
+      $("apuesta-esperando").textContent = fmtFichas(m.fichas_mesa);
+      $("detalle-esperando").textContent = `${Math.round(m.fichas_mesa / m.apuesta)} rondas de 🪙 ${fmtFichas(m.apuesta)}`;
       mostrarVista("vista-esperando"); cargarSaldo(); escucharMesa();
     }
 
-    // Consulta el estado de la mesa (y manda el latido si todavía espero rival)
     async function verificarMiMesa() {
       if (!mesaActualId || tirando) return;
       const id = mesaActualId;
@@ -211,51 +266,70 @@
     }
 
     function manejarEstado(data) {
+      if (!data || data.estado === "esperando") return;
       ultimoEstado = data;
       if (data.estado === "cancelada") {
-        dejarDeEscucharMesa(); alert("Tu mesa se cerró por falta de conexión. Te devolvimos las fichas."); volverAlInicio();
-      } else if (data.estado === "jugando") {
-        if (!enDuelo) entrarDuelo(data); else pintarDuelo(data);
-      } else if (data.estado === "terminada") {
-        if (!enDuelo) entrarDuelo(data);
-        mostrarFinal(data);
+        dejarDeEscucharMesa(); alert("Tu mesa se cerró por falta de conexión. Te devolvimos las fichas."); volverAlInicio(); return;
       }
+      if (!enDuelo) entrarDuelo(data);
+      if (revelando) { pendiente = data; return; }                 // no pisar la animación en curso
+      if (data.ult && data.ult.ronda > mostradaRonda) { revelarRonda(data); return; }
+      if (data.estado === "terminada") { mostrarFinal(data); return; }
+      pintarRonda(data);
     }
 
-    async function unirseAMesa(mesaId, rival) {
+    async function unirseAMesa(mesaId) {
       try {
         const data = await pvpUnirseMesa(mesaId);
         mesaActualId = mesaId; cargarSaldo(); escucharMesa(); manejarEstado(data);
       } catch (e) { alert(e.message); cargarMesasDisponibles(); }
     }
 
-    // ---- Duelo: los dos sentados, cada uno tira ----
+    // ---- Mesa en juego ----
     function entrarDuelo(data) {
-      enDuelo = true; tirando = false;
-      $("nombre-rival").textContent = "Rival: " + (data.rival_username || "");
+      enDuelo = true; tirando = false; revelando = false; pendiente = null; ultMiStack = null; rondaPintada = 0;
+      mostradaRonda = data.ult ? data.ult.ronda : 0;
+      $("nombre-rival").textContent = data.rival_username || "Rival";
       $("duelo-apuesta").textContent = fmtFichas(data.apuesta);
-      $("duelo-premio").textContent = fmtFichas(Math.round(Number(data.apuesta) * 1.9));
-      ["carta-vos", "carta-rival"].forEach(i => { $(i).className = "carta-visual"; $(i).textContent = "?"; });
-      $("mensaje-resultado").textContent = ""; $("mensaje-resultado").className = "mensaje";
-      $("btn-otra").style.display = "none"; $("btn-tirar").style.display = "";
+      $("duelo-premio").textContent = fmtFichas(premioRonda(data.apuesta));
+      reiniciarCartas(); $("mensaje-resultado").textContent = ""; $("mensaje-resultado").className = "mensaje";
+      const b = $("btn-rendirse"); b.style.display = ""; b.disabled = false; b.classList.remove("seguro"); b.textContent = "🏳️ Rendirme";
+      $("zona-juego").style.display = ""; $("zona-final").style.display = "none";
       mostrarVista("vista-duelo"); cargarSaldo();
-      if (data.estado === "jugando") pintarDuelo(data);
+    }
+    function reiniciarCartas() {
+      ["carta-vos", "carta-rival"].forEach(i => { $(i).className = "carta-visual"; $(i).textContent = "?"; });
+    }
+
+    function pintarMarcador(data) {
+      const fv = $("fichas-vos"), fr = $("fichas-rival"), mi = Number(data.mi_stack), ri = Number(data.stack_rival);
+      fv.textContent = "🪙 " + fmtFichas(mi); fr.textContent = "🪙 " + fmtFichas(ri);
+      if (ultMiStack !== null && mi !== ultMiStack) {
+        const sube = mi > ultMiStack;
+        fv.className = "fichas " + (sube ? "sube" : "baja"); fr.className = "fichas " + (sube ? "baja" : "sube");
+        setTimeout(() => { fv.className = "fichas"; fr.className = "fichas"; }, 1600);
+      }
+      ultMiStack = mi;
+      $("gan-vos").textContent = "Rondas ganadas: " + data.mis_victorias;
+      $("gan-rival").textContent = "Rondas ganadas: " + data.victorias_rival;
+      $("barra-vos").style.width = (mi + ri > 0 ? Math.round(mi * 100 / (mi + ri)) : 50) + "%";
     }
 
     function iniciarReloj() {
       clearInterval(relojCuenta);
       relojCuenta = setInterval(() => {
-        const s = Math.max(0, Math.ceil((finTiroMs - Date.now()) / 1000));
-        const yoTire = ultimoEstado && ultimoEstado.yo_tire;
-        $("cuenta-duelo").textContent = ultimoEstado && ultimoEstado.estado === "jugando"
-          ? (yoTire ? `Esperando a tu rival… (${s} s)` : `Tenés ${s} s para tirar; si no, tiramos por vos`) : "";
+        if (revelando || !ultimoEstado || ultimoEstado.estado !== "jugando") { $("cuenta-duelo").textContent = ""; return; }
+        const t = Math.max(0, Math.ceil((finTiroMs - Date.now()) / 1000));
+        $("cuenta-duelo").textContent = ultimoEstado.yo_tire ? `Esperando a tu rival… (${t} s)` : `Tu turno: tirá en ${t} s o tiramos por vos`;
       }, 250);
     }
 
-    function pintarDuelo(data) {
+    function pintarRonda(data) {
       finTiroMs = Date.now() + Number(data.segundos_restantes || 0) * 1000; iniciarReloj();
+      if (rondaPintada !== data.ronda) { rondaPintada = data.ronda; reiniciarCartas(); $("ronda-n").textContent = "Ronda " + data.ronda; }
+      pintarMarcador(data);
       const vos = $("carta-vos"), riv = $("carta-rival");
-      if (data.yo_tire && data.mi_valor !== null && !vos.classList.contains("pop") && vos.textContent === "?") { vos.textContent = cfg.formatear(data.mi_valor); vos.classList.add("pop"); }
+      if (data.yo_tire && data.mi_valor !== null && vos.textContent === "?") { vos.textContent = cfg.formatear(data.mi_valor); vos.classList.add("pop"); }
       $("est-vos").textContent = data.yo_tire ? "Ya tiraste ✔" : "Te toca tirar";
       $("est-vos").className = "est" + (data.yo_tire ? " ok" : "");
       $("est-rival").textContent = data.rival_tiro ? "Ya tiró ✔" : "Pensando…";
@@ -265,7 +339,7 @@
       $("btn-tirar").style.display = data.yo_tire ? "none" : "";
     }
 
-    // Animación de suspenso: números que cambian rápido hasta que llega el valor real
+    // Números que cambian rápido hasta que llega el valor real
     function suspenso(el) {
       el.className = "carta-visual tirando";
       const [a, b] = extra.rango;
@@ -274,33 +348,76 @@
     }
 
     async function tirar() {
-      if (!mesaActualId || tirando || !enDuelo) return;
+      if (!mesaActualId || tirando || revelando || !enDuelo) return;
       tirando = true; $("btn-tirar").disabled = true; Sonido.tocar(extra.sonido);
       const parar = suspenso($("carta-vos"));
       try {
-        const [data] = await Promise.all([llamarRPC("pvp_tirar", { p_mesa_id: mesaActualId }), Efectos.esperar(Efectos.reducido ? 0 : 1200)]);
+        const [data] = await Promise.all([llamarRPC("pvp_tirar", { p_mesa_id: mesaActualId }), pausa(1100)]);
         parar(); tirando = false;
-        const vos = $("carta-vos"); vos.textContent = cfg.formatear(data.mi_valor); vos.classList.add("pop"); Sonido.tocar("ficha");
+        const seResolvio = data.ult && data.ult.ronda > mostradaRonda;
+        if (!seResolvio && data.mi_valor !== null) { const v = $("carta-vos"); v.textContent = cfg.formatear(data.mi_valor); v.classList.add("pop"); Sonido.tocar("ficha"); }
         manejarEstado(data);
       } catch (e) {
         parar(); tirando = false; $("carta-vos").textContent = "?"; $("btn-tirar").disabled = false; alert(e.message);
       }
     }
 
-    async function mostrarFinal(data) {
-      if (!enDuelo || $("btn-otra").style.display === "") return;      // ya mostrado
-      dejarDeEscucharMesa(); clearInterval(relojCuenta); $("cuenta-duelo").textContent = "";
+    // Se resolvió una ronda: mostramos las dos cartas, el resultado y cómo cambian las fichas
+    async function revelarRonda(data) {
+      revelando = true; clearInterval(relojCuenta); $("cuenta-duelo").textContent = "";
+      const u = data.ult, vos = $("carta-vos"), riv = $("carta-rival"), m = $("mensaje-resultado");
       $("btn-tirar").style.display = "none"; $("est-vos").textContent = ""; $("est-rival").textContent = "";
-      const vos = $("carta-vos"), riv = $("carta-rival");
-      vos.className = "carta-visual"; vos.textContent = cfg.formatear(data.mi_valor);
-      riv.classList.remove("esperando-rival");
-      const parar = suspenso(riv); await Efectos.esperar(Efectos.reducido ? 0 : 1000); parar();
-      riv.textContent = cfg.formatear(data.valor_rival); riv.classList.add("pop");
-      const m = $("mensaje-resultado");
-      if (data.hubo_empate) { m.textContent = "Empate — se te devolvió tu apuesta"; m.className = "mensaje"; }
-      else if (data.yo_gane) { m.textContent = `¡Ganaste la mesa! +🪙 ${fmtFichas(data.premio)} 🎉`; m.className = "mensaje ganaste"; vos.classList.add("gano"); riv.classList.add("perdio"); Sonido.tocar("win"); }
-      else { m.textContent = "Tu rival ganó esta vez"; m.className = "mensaje perdiste"; riv.classList.add("gano"); vos.classList.add("perdio"); Sonido.tocar("lose"); }
-      $("btn-otra").style.display = ""; cargarSaldo();
+      $("ronda-n").textContent = "Ronda " + u.ronda;
+      vos.className = "carta-visual"; vos.textContent = cfg.formatear(u.mi_valor);
+      riv.className = "carta-visual"; const parar = suspenso(riv);
+      await pausa(900); parar();
+      riv.textContent = cfg.formatear(u.valor_rival); riv.classList.add("pop");
+      const ganancia = premioRonda(data.apuesta) - Number(data.apuesta);
+      if (u.resultado === "gane") { m.textContent = `Ganaste la ronda ${u.ronda}: +🪙 ${fmtFichas(ganancia)}`; m.className = "mensaje ganaste"; vos.classList.add("gano"); riv.classList.add("perdio"); Sonido.tocar("win"); }
+      else if (u.resultado === "perdi") { m.textContent = `Perdiste la ronda ${u.ronda}: −🪙 ${fmtFichas(data.apuesta)}`; m.className = "mensaje perdiste"; riv.classList.add("gano"); vos.classList.add("perdio"); Sonido.tocar("lose"); }
+      else { m.textContent = `Empate en la ronda ${u.ronda}: nadie pierde fichas`; m.className = "mensaje"; Sonido.tocar("click"); }
+      pintarMarcador(data);
+      await pausa(2100);
+      mostradaRonda = u.ronda; revelando = false;
+      const sig = pendiente || data; pendiente = null;
+      manejarEstado(sig);
+    }
+
+    function mostrarFinal(data) {
+      dejarDeEscucharMesa(); clearInterval(relojCuenta); revelando = false;
+      pintarMarcador(data);
+      $("zona-juego").style.display = "none"; $("btn-rendirse").style.display = "none"; $("zona-final").style.display = "";
+      const t = $("final-titulo");
+      if (data.rindio_yo) { t.textContent = data.yo_gane ? "Te retiraste con ganancia 💰" : data.hubo_empate ? "Te retiraste empatado" : "Te rendiste"; t.className = "gran" + (data.yo_gane ? " ganaste" : ""); Sonido.tocar(data.yo_gane ? "win" : "click"); }
+      else if (data.yo_gane) { t.textContent = "¡Ganaste la mesa! 🎉"; t.className = "gran ganaste"; Sonido.tocar("bigwin"); }
+      else if (data.hubo_empate) { t.textContent = "Mesa empatada"; t.className = "gran"; Sonido.tocar("click"); }
+      else if (data.rindio_rival) { t.textContent = "Tu rival se retiró con ventaja"; t.className = "gran perdiste"; Sonido.tocar("lose"); }
+      else { t.textContent = "Perdiste la mesa"; t.className = "gran perdiste"; Sonido.tocar("lose"); }
+      let motivo = "";
+      if (data.motivo_fin === "rendicion") motivo = data.rindio_yo ? "Te rendiste." : `${data.rival_username} se rindió.`;
+      else if (data.motivo_fin === "inactividad") motivo = "La mesa se cerró porque alguien dejó de jugar.";
+      else motivo = data.yo_gane ? `${data.rival_username} se quedó sin fichas para otra ronda.` : "Te quedaste sin fichas para otra ronda.";
+      $("final-motivo").textContent = motivo;
+      const neto = Number(data.mi_neto || 0);
+      $("final-cobro").innerHTML = `Cobraste <b>🪙 ${fmtFichas(data.mi_cobro || 0)}</b> (${neto >= 0 ? "+" : "−"}${fmtFichas(Math.abs(neto))} frente a lo que trajiste)`;
+      cargarSaldo();
+    }
+
+    // Rendirse: dos toques para evitar errores. Termina la mesa y cada uno cobra lo que le queda
+    async function rendirse() {
+      const b = $("btn-rendirse");
+      if (!b.classList.contains("seguro")) {
+        b.classList.add("seguro"); b.textContent = "¿Seguro? Tocá de nuevo";
+        clearTimeout(rendirseTimer);
+        rendirseTimer = setTimeout(() => { b.classList.remove("seguro"); b.textContent = "🏳️ Rendirme"; }, 4000);
+        return;
+      }
+      clearTimeout(rendirseTimer); b.disabled = true;
+      try {
+        const data = await llamarRPC("pvp_rendirse", { p_mesa_id: mesaActualId });
+        pendiente = null; revelando = false; if (data.ult) mostradaRonda = data.ult.ronda;
+        manejarEstado(data);
+      } catch (e) { b.disabled = false; b.classList.remove("seguro"); b.textContent = "🏳️ Rendirme"; alert(e.message); }
     }
 
     async function cancelarMesaActual() {
@@ -310,8 +427,8 @@
     }
 
     function volverAlInicio() {
-      dejarDeEscucharMesa(); clearInterval(relojCuenta);
-      mesaActualId = null; enDuelo = false; tirando = false; ultimoEstado = null;
+      dejarDeEscucharMesa(); clearInterval(relojCuenta); clearTimeout(rendirseTimer);
+      mesaActualId = null; enDuelo = false; tirando = false; revelando = false; pendiente = null; ultimoEstado = null;
       mostrarVista("vista-sin-mesa"); cargarMesasDisponibles(); cargarSaldo();
     }
 
@@ -326,17 +443,17 @@
 
     window.addEventListener("beforeunload", () => Realtime.cerrar());
     pintarEstadoWS(false);
-    Mesa.iniciar({ juego: "pvp_" + juego, inicial: 1000 });
+    Mesa.iniciar({ juego: "pvp_" + juego, inicial: 1000, onApuesta: actualizarTrae }).then(actualizarTrae);
     cargarMesasDisponibles();
 
-    // Si recargaste la página con una mesa abierta, jugando, o terminada sin ver, la retomamos
+    // Si recargaste la página con una mesa abierta, en juego, o terminada sin ver, la retomamos
     (async () => {
       try {
         const m = await llamarRPC("pvp_mi_mesa");
         if (!m) return;
         if (m.juego !== juego) { if (m.estado === "esperando" || m.estado === "jugando") location.replace("pvp.html?juego=" + m.juego); return; }
         mesaActualId = m.id;
-        if (m.estado === "esperando") esperarRival(m.apuesta);
+        if (m.estado === "esperando") esperarRival(m);
         else { escucharMesa(); manejarEstado(m); }
       } catch (e) {}
     })();
