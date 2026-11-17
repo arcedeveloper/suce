@@ -73,7 +73,7 @@ function crearAdminLive({ pool, rt }) {
         }
       } else if (fn === "pvp_crear_mesa") {
         if (hayAdmin()) marcarUsuario(claims.sub);
-      } else if (fn === "pvp_unirse_mesa" || fn === "pvp_cancelar_mesa") {
+      } else if (fn === "pvp_unirse_mesa" || fn === "pvp_cancelar_mesa" || fn === "pvp_rendirse" || fn === "pvp_tirar") {
         if (hayAdmin()) {
           marcarUsuario(claims.sub);
           const id = String(body.p_mesa_id ?? "").replace(/\D/g, "");

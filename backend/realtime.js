@@ -203,7 +203,7 @@ function crearRealtime(httpServer, { jwt, jwtSecret }) {
       } else if (fn === "pvp_tirar") {
         const id = String(body.p_mesa_id ?? "").replace(/\D/g, "");
         if (id) notificar("mesa:" + id);                  // avisa al rival: "ya tiré"
-      } else if (fn === "pvp_unirse_mesa" || fn === "pvp_cancelar_mesa") {
+      } else if (fn === "pvp_unirse_mesa" || fn === "pvp_cancelar_mesa" || fn === "pvp_rendirse") {
         const id = String(body.p_mesa_id ?? "").replace(/\D/g, "");
         if (id) notificar("mesa:" + id);
         notificarLobbies(null);
