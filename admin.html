@@ -152,8 +152,8 @@
             <div class="sub" style="font-size:.8rem;">Solo avisan: nadie se frena y todos siguen jugando.</div>
           </div>
           <div class="lim-form">
-            <div><label for="lim-jugador">Tope por jugador</label><input type="number" id="lim-jugador" min="1" inputmode="numeric"></div>
-            <div><label for="lim-total">Tope total</label><input type="number" id="lim-total" min="1" inputmode="numeric"></div>
+            <div><label for="lim-jugador">Tope por jugador</label><input type="text" id="lim-jugador" inputmode="numeric" autocomplete="off"></div>
+            <div><label for="lim-total">Tope total</label><input type="text" id="lim-total" inputmode="numeric" autocomplete="off"></div>
             <button class="secundario" onclick="guardarLimites()">Guardar</button>
           </div>
         </div>
@@ -337,7 +337,7 @@ const clase = (n) => (n > 0 ? "pos" : n < 0 ? "neg" : "dim");
     }
     function renderLimites(d) {
       const tj = Number(d.tope_jugador), tt = Number(d.tope_total), suma = Number(d.total_ganadores), casa = Number(d.resultado_casa);
-      if (!editandoLimites) { $("lim-jugador").value = tj; $("lim-total").value = tt; }
+      if (!editandoLimites) { $("lim-jugador").value = fmt(tj); $("lim-total").value = fmt(tt); }
       $("lim-suma").textContent = "🪙 " + fmt(suma); $("lim-tope-total").textContent = "🪙 " + fmt(tt);
       $("lim-casa").textContent = (casa >= 0 ? "La casa va +" : "La casa va −") + fmt(Math.abs(casa));
       const pct = Math.min(100, Math.round(suma * 100 / tt)), b = $("lim-barra-total");
@@ -356,12 +356,17 @@ const clase = (n) => (n > 0 ? "pos" : n < 0 ? "neg" : "dim");
     async function guardarLimites() {
       const m = $("lim-msg"); m.textContent = "Guardando…";
       try {
-        await llamarRPC("admin_limites_set", { p_tope_jugador: Number($("lim-jugador").value), p_tope_total: Number($("lim-total").value) });
+        await llamarRPC("admin_limites_set", { p_tope_jugador: soloNumero("lim-jugador"), p_tope_total: soloNumero("lim-total") });
         editandoLimites = false; m.textContent = "Guardado ✔"; setTimeout(() => { if (m.textContent === "Guardado ✔") m.textContent = ""; }, 2500);
         cargarLimites();
       } catch (e) { m.textContent = e.message; }
     }
-    ["lim-jugador", "lim-total"].forEach((id) => $(id).addEventListener("input", () => { editandoLimites = true; }));
+    const soloNumero = (id) => Number($(id).value.replace(/\D/g, "")) || 0;      // "50.000" -> 50000
+    ["lim-jugador", "lim-total"].forEach((id) => $(id).addEventListener("input", (ev) => {
+      editandoLimites = true;
+      const n = soloNumero(id);
+      ev.target.value = n ? fmt(n) : "";                                          // pone los puntos mientras escribís
+    }));
 
     function irTab(t) {
       tabActual = t;
