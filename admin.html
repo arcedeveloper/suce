@@ -105,6 +105,21 @@
   tr.flash td, tr.feed-nuevo td { animation:filaFlash 1.3s ease-out; }
   .aviso-err { background:rgba(229,72,77,.12); border:1px solid rgba(229,72,77,.4); color:#fecaca; padding:10px 14px;
                border-radius:10px; margin-bottom:14px; font-size:.88rem; }
+
+  /* Límites de ganancia (aviso) */
+  .lim-cab { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+  .lim-form { display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap; }
+  .lim-form label { font-size:.74rem; color:var(--text-dim); display:block; margin-bottom:3px; }
+  .lim-form input { width:130px; }
+  .lim-form button { width:auto; padding:10px 16px; }
+  .lim-barra { height:12px; border-radius:999px; background:rgba(255,255,255,.08); overflow:hidden; margin:8px 0 4px; }
+  .lim-barra i { display:block; height:100%; width:0; background:linear-gradient(90deg,#2dd4bf,#5eead4); transition:width .5s; }
+  .lim-barra i.med { background:linear-gradient(90deg,#f59e0b,#fbbf24); } .lim-barra i.alta { background:linear-gradient(90deg,#dc2626,#f87171); }
+  .lim-fila { display:grid; grid-template-columns:minmax(80px,1.1fr) 2fr auto; gap:10px; align-items:center; padding:7px 0; border-top:1px solid rgba(255,255,255,.06); font-size:.88rem; }
+  .lim-fila .lim-barra { margin:0; height:8px; }
+  .lim-fila b.rojo { color:#f87171; } .lim-fila b.ambar { color:#fbbf24; }
+  .lim-aviso { background:rgba(229,72,77,.12); border:1px solid rgba(229,72,77,.4); color:#fecaca; padding:9px 12px; border-radius:10px; margin:10px 0; font-size:.86rem; }
+  .lim-nota { color:var(--text-dim); font-size:.78rem; margin-top:10px; }
 </style>
 </head>
 <body>
@@ -130,6 +145,28 @@
 
     <div id="error-global" class="aviso-err oculto"></div>
     <section id="tab-resumen">
+      <div class="panel" id="panel-limites">
+        <div class="lim-cab">
+          <div>
+            <h3 style="margin:0 0 4px;">🎯 Límites de ganancia</h3>
+            <div class="sub" style="font-size:.8rem;">Solo avisan: nadie se frena y todos siguen jugando.</div>
+          </div>
+          <div class="lim-form">
+            <div><label for="lim-jugador">Tope por jugador</label><input type="number" id="lim-jugador" min="1" inputmode="numeric"></div>
+            <div><label for="lim-total">Tope total</label><input type="number" id="lim-total" min="1" inputmode="numeric"></div>
+            <button class="secundario" onclick="guardarLimites()">Guardar</button>
+          </div>
+        </div>
+        <div id="lim-msg" class="sub" style="min-height:1.1em; margin-top:6px; font-size:.8rem;"></div>
+        <div id="lim-aviso" class="lim-aviso oculto"></div>
+        <div style="display:flex; justify-content:space-between; font-size:.86rem; margin-top:6px;">
+          <span>Suman los que van ganando: <b id="lim-suma">0</b> de <span id="lim-tope-total">0</span></span>
+          <span class="sub" id="lim-casa"></span>
+        </div>
+        <div class="lim-barra"><i id="lim-barra-total"></i></div>
+        <div id="lim-lista"></div>
+        <div class="lim-nota">Ganancia de un jugador = lo que ganó menos lo que perdió jugando, menos las fichas que le retiraste con «Quitar fichas». Si le retirás fichas, su aviso baja.</div>
+      </div>
       <div class="kpis" id="kpis"></div>
 
       <div class="dos-col">
@@ -291,6 +328,41 @@ const clase = (n) => (n > 0 ? "pos" : n < 0 ? "neg" : "dim");
     let tabActual = "resumen";
     let detId = null;
 
+
+    // ---- Límites de ganancia (solo aviso) ----
+    let editandoLimites = false;
+    async function cargarLimites() {
+      try { renderLimites(await llamarRPC("admin_limites_estado")); }
+      catch (e) { $("lim-msg").textContent = "No se pudieron cargar los límites (¿corriste limites_ganancia.sql en Neon?)"; }
+    }
+    function renderLimites(d) {
+      const tj = Number(d.tope_jugador), tt = Number(d.tope_total), suma = Number(d.total_ganadores), casa = Number(d.resultado_casa);
+      if (!editandoLimites) { $("lim-jugador").value = tj; $("lim-total").value = tt; }
+      $("lim-suma").textContent = "🪙 " + fmt(suma); $("lim-tope-total").textContent = "🪙 " + fmt(tt);
+      $("lim-casa").textContent = (casa >= 0 ? "La casa va +" : "La casa va −") + fmt(Math.abs(casa));
+      const pct = Math.min(100, Math.round(suma * 100 / tt)), b = $("lim-barra-total");
+      b.style.width = pct + "%"; b.className = pct >= 90 ? "alta" : pct >= 70 ? "med" : "";
+      const sobre = Number(d.cantidad_sobre_tope), av = $("lim-aviso"), msgs = [];
+      if (suma >= tt) msgs.push(`Los ganadores ya suman 🪙 ${fmt(suma)}: pasaron el tope total de 🪙 ${fmt(tt)}.`);
+      else if (pct >= 90) msgs.push(`Los ganadores están cerca del tope total (${pct} %).`);
+      if (sobre > 0) msgs.push(sobre === 1 ? `1 jugador pasó el tope de 🪙 ${fmt(tj)}.` : `${sobre} jugadores pasaron el tope de 🪙 ${fmt(tj)} por jugador.`);
+      av.classList.toggle("oculto", msgs.length === 0); av.innerHTML = msgs.map(esc).join("<br>");
+      const lista = d.jugadores || [];
+      $("lim-lista").innerHTML = lista.length ? lista.map((j) => {
+        const pj = Number(j.pendiente), p = Math.min(100, Math.round(pj * 100 / tj)), cls = pj >= tj ? "alta" : p >= 80 ? "med" : "";
+        return `<div class="lim-fila"><span>${esc(j.username)}</span><div class="lim-barra"><i class="${cls}" style="width:${p}%"></i></div><b class="${pj >= tj ? "rojo" : p >= 80 ? "ambar" : ""}">🪙 ${fmt(pj)}</b></div>`;
+      }).join("") : '<div class="sub" style="padding:8px 0;">Nadie va ganando todavía.</div>';
+    }
+    async function guardarLimites() {
+      const m = $("lim-msg"); m.textContent = "Guardando…";
+      try {
+        await llamarRPC("admin_limites_set", { p_tope_jugador: Number($("lim-jugador").value), p_tope_total: Number($("lim-total").value) });
+        editandoLimites = false; m.textContent = "Guardado ✔"; setTimeout(() => { if (m.textContent === "Guardado ✔") m.textContent = ""; }, 2500);
+        cargarLimites();
+      } catch (e) { m.textContent = e.message; }
+    }
+    ["lim-jugador", "lim-total"].forEach((id) => $(id).addEventListener("input", () => { editandoLimites = true; }));
+
     function irTab(t) {
       tabActual = t;
       ["resumen", "jugadores", "actividad", "juegos"].forEach((x) => {
@@ -305,6 +377,7 @@ async function cargarTodo(manual) {
     const [m, u, a] = await Promise.all([adminMetricas(), adminListaUsuarios(), adminActividad(40)]);
     metricas = m; usuarios = u; actividad = a;
     renderKPIs(); renderGraficos(); renderUsuarios(); renderActividad();
+    cargarLimites();
     mostrarError("");
     $("actualizado").dataset.base = "Actualizado " + new Date().toLocaleTimeString("es-PY", { timeZone: TZ });
     pintarEnVivo();
