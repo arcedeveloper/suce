@@ -111,7 +111,9 @@
   .lim-form { display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap; }
   .lim-form label { font-size:.74rem; color:var(--text-dim); display:block; margin-bottom:3px; }
   .lim-form input { width:130px; }
-  .lim-form button { width:auto; padding:10px 16px; }
+  .lim-form input, .lim-form button { height:54px; margin:0; box-sizing:border-box; }
+  .lim-form button { width:auto; padding:0 22px; }
+  @media (max-width:560px) { .lim-cab { flex-direction:column; } .lim-form { width:100%; } .lim-form > div { flex:1; min-width:0; } .lim-form input { width:100%; } .lim-form button { width:100%; } }
   .lim-barra { height:12px; border-radius:999px; background:rgba(255,255,255,.08); overflow:hidden; margin:8px 0 4px; }
   .lim-barra i { display:block; height:100%; width:0; background:linear-gradient(90deg,#2dd4bf,#5eead4); transition:width .5s; }
   .lim-barra i.med { background:linear-gradient(90deg,#f59e0b,#fbbf24); } .lim-barra i.alta { background:linear-gradient(90deg,#dc2626,#f87171); }
@@ -154,7 +156,7 @@
           <div class="lim-form">
             <div><label for="lim-jugador">Tope por jugador</label><input type="text" id="lim-jugador" inputmode="numeric" autocomplete="off"></div>
             <div><label for="lim-total">Tope total</label><input type="text" id="lim-total" inputmode="numeric" autocomplete="off"></div>
-            <button class="secundario" onclick="guardarLimites()">Guardar</button>
+            <button onclick="guardarLimites()">Guardar</button>
           </div>
         </div>
         <div id="lim-msg" class="sub" style="min-height:1.1em; margin-top:6px; font-size:.8rem;"></div>
